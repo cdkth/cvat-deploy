@@ -1,55 +1,84 @@
 # CVAT (S3 + RDS)
 
-- [Mounting cloud storage](#mounting-cloud-storage)
-  - [AWS S3 bucket](#aws-s3-bucket-as-filesystem)
-    - [Ubuntu 20.04](#aws_s3_ubuntu_2004)
-      - [Mount](#aws_s3_mount)
-      - [Automatically mount](#aws_s3_automatically_mount)
-        - [Using systemd](#aws_s3_using_systemd)
-- [Quick installation guide](#quick-installation-guide)
-  - [Ubuntu 20.04 (x86_64/amd64)](#ubuntu-2004-x86_64amd64)
-    - [Semi-automatic and Automatic Annotation](#semi-automatic-and-automatic-annotation)
-    - [Analytics: management and monitoring of data annotation team](#analytics-management-and-monitoring-of-data-annotation-team)
+## Prepare OS
 
-# Mounting cloud storage
-## AWS S3 bucket as filesystem
-### <a name="aws_s3_ubuntu_2004">Ubuntu 20.04</a>
-#### <a name="aws_s3_mount">Mount</a>
+    sudo apt-get update -y
+    sudo apt-get upgrade -y
+
+## Install Docker & Docker Compose
+
+    sudo apt-get --no-install-recommends install -y \
+      apt-transport-https \
+      ca-certificates \
+      curl \
+      gnupg-agent \
+      software-properties-common
+    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
+    sudo add-apt-repository \
+      "deb [arch=amd64] https://download.docker.com/linux/ubuntu \
+      $(lsb_release -cs) \
+      stable"
+    sudo apt-get update
+    sudo apt-get --no-install-recommends install -y docker-ce docker-ce-cli containerd.io
+    sudo apt-get --no-install-recommends install -y python3-pip python3-setuptools
+    sudo python3 -m pip install setuptools docker-compose
+
+## Install Portainer for Docker Management (Optional)
+
+    docker volume create portainer_data
+    docker run -d -p 8000:8000 -p 9000:9000 \
+        --name=portainer \
+        --restart=always \
+        -v /var/run/docker.sock:/var/run/docker.sock \
+        -v portainer_data:/data portainer/portainer-ce
+
+## Install CVAT
+
+    sudo apt-get --no-install-recommends install -y git
+    git clone https://github.com/opencv/cvat
+    cd cvat
+
+## <a name="aws_s3_mount">Automatically mount AWS S3 bucket as filesystem using S3FS</a>
+
+1.  Create S3 Bucket through AWS Console or AWS ClI
+
+    S3 bucket name: `cvat-default-volume`
+
+1.  Create a mount point
+
+    ```
+    sudo mkdir /mnt/s3-cvat-default-volume
+    ```
 
 1.  Install s3fs:
 
-    ```bash
+    ```
     sudo apt install s3fs
     ```
 
-1.  Enter your credentials in a file  `${HOME}/.passwd-s3fs`  and set owner-only permissions:
+1.  Enter your credentials in a file  `/etc/passwd-s3fs`  and set owner-only permissions:
 
-    ```bash
-    echo ACCESS_KEY_ID:SECRET_ACCESS_KEY > ${HOME}/.passwd-s3fs
-    chmod 600 ${HOME}/.passwd-s3fs
+    ```
+    echo ACCESS_KEY_ID:SECRET_ACCESS_KEY > /etc/passwd-s3fs
+    chmod 640 /etc/passwd-s3fs
     ```
 
 1.  Uncomment `user_allow_other` in the `/etc/fuse.conf` file: `sudo nano /etc/fuse.conf`
 
 For more details see [here](https://github.com/s3fs-fuse/s3fs-fuse).
 
-#### <a name="aws_s3_automatically_mount">Automatically mount</a>
-
-##### <a name="aws_s3_using_systemd">Using systemd</a>
-
 1.  Create unit file `sudo nano /etc/systemd/system/s3fs.service`
-    (replace `user_name`, `bucket_name`, `mount_point`, `/path/to/.passwd-s3fs`):
 
-    ```bash
+    ```
     [Unit]
     Description=FUSE filesystem over AWS S3 bucket
     After=network.target
 
     [Service]
-    Environment="MOUNT_POINT=<mount_point>"
-    User=<user_name>
-    Group=<user_name>
-    ExecStart=s3fs <bucket_name> ${MOUNT_POINT} -o passwd_file=/path/to/.passwd-s3fs -o allow_other
+    Environment="MOUNT_POINT=/mnt/s3-cvat-default-volume"
+    User=root
+    Group=root
+    ExecStart=s3fs cvat-default-volume ${MOUNT_POINT} -o passwd_file=/etc/passwd-s3fs -o allow_other -o umask=0022
     ExecStop=fusermount -u ${MOUNT_POINT}
     Restart=always
     Type=forking
@@ -60,153 +89,430 @@ For more details see [here](https://github.com/s3fs-fuse/s3fs-fuse).
 
 1.  Update the system configurations, enable unit autorun when the system boots, mount the bucket:
 
-    ```bash
+    ```
     sudo systemctl daemon-reload
     sudo systemctl enable s3fs.service
     sudo systemctl start s3fs.service
     ```
 
-# Quick installation guide
+## Create RDS PostgreSQL through AWS Console or AWS CLI
 
-Before you can use CVAT, you’ll need to get it installed. The document below
-contains instructions for the most popular operating systems. If your system is
-not covered by the document it should be relatively straight forward to adapt
-the instructions below for other systems.
+    Hostname Prefix: `cvat-database`  
+    Initial DB Name: `db_name`  
+    Master User Name: `db_username`  
+    Master Password: `db_password`
 
-Probably you need to modify the instructions below in case you are behind a proxy
-server. Proxy is an advanced topic and it is not covered by the guide.
+## Remove PostgresSQL image, Add DB details (AWS RDS), Change volumes to S3
 
-## Ubuntu 20.04 (x86_64/amd64)
+1.  Edit docker-compose file `sudo nano /root/cvat/docker-compose.yml`
 
-- Open a terminal window. If you don't know how to open a terminal window on
-  Ubuntu please read [the answer](https://askubuntu.com/questions/183775/how-do-i-open-a-terminal).
+    ```
+    version: '3.3'
+    services:
+      cvat_redis:
+        container_name: cvat_redis
+        image: redis:4.0-alpine
+        networks:
+          default:
+            aliases:
+              - redis
+        restart: always
 
-- Type commands below into the terminal window to install `docker`. More
-  instructions can be found [here](https://docs.docker.com/install/linux/docker-ce/ubuntu/).
+      cvat:
+        container_name: cvat
+        image: cvat/server
+        restart: always
+        depends_on:
+          - cvat_redis
+        build:
+          context: .
+          args:
+            http_proxy:
+            https_proxy:
+            no_proxy: nuclio,${no_proxy}
+            socks_proxy:
+            USER: 'django'
+            DJANGO_CONFIGURATION: 'production'
+            TZ: 'Etc/UTC'
+            CLAM_AV: 'no'
+        environment:
+          DJANGO_MODWSGI_EXTRA_ARGS: ''
+          ALLOWED_HOSTS: '*'
+          CVAT_REDIS_HOST: 'cvat_redis'
+          CVAT_POSTGRES_HOST: 'cvat-database.dbid.region.rds.amazonaws.com'
+          CVAT_POSTGRES_DBNAME: 'db_name'
+          CVAT_POSTGRES_USER: 'db_username'
+          CVAT_POSTGRES_PASSWORD: 'db_password'
+        volumes:
+          - cvat_data:/home/django/data
+          - cvat_keys:/home/django/keys
+          - cvat_logs:/home/django/logs
+          - cvat_models:/home/django/models
 
-  ```sh
-  sudo apt-get update
-  sudo apt-get --no-install-recommends install -y \
-    apt-transport-https \
-    ca-certificates \
-    curl \
-    gnupg-agent \
-    software-properties-common
-  curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
-  sudo add-apt-repository \
-    "deb [arch=amd64] https://download.docker.com/linux/ubuntu \
-    $(lsb_release -cs) \
-    stable"
-  sudo apt-get update
-  sudo apt-get --no-install-recommends install -y docker-ce docker-ce-cli containerd.io
-  ```
+      cvat_ui:
+        container_name: cvat_ui
+        image: cvat/ui
+        restart: always
+        build:
+          context: .
+          args:
+            http_proxy:
+            https_proxy:
+            no_proxy:
+            socks_proxy:
+          dockerfile: Dockerfile.ui
 
-- Perform [post-installation steps](https://docs.docker.com/install/linux/linux-postinstall/)
-  to run docker without root permissions.
+        networks:
+          default:
+            aliases:
+              - ui
+        depends_on:
+          - cvat
 
-  ```sh
-  sudo groupadd docker
-  sudo usermod -aG docker $USER
-  ```
+      cvat_proxy:
+        container_name: cvat_proxy
+        image: nginx:stable-alpine
+        restart: always
+        depends_on:
+          - cvat
+          - cvat_ui
+        environment:
+          CVAT_HOST: localhost
+        ports:
+          - '8080:80'
+        volumes:
+          - ./cvat_proxy/nginx.conf:/etc/nginx/nginx.conf:ro
+          - ./cvat_proxy/conf.d/cvat.conf.template:/etc/nginx/conf.d/cvat.conf.template:ro
+        command: /bin/sh -c "envsubst '$$CVAT_HOST' < /etc/nginx/conf.d/cvat.conf.template > /etc/nginx/conf.d/default.conf && nginx -g 'daemon off;'"
 
-  Log out and log back in (or reboot) so that your group membership is
-  re-evaluated. You can type `groups` command in a terminal window after
-  that and check if `docker` group is in its output.
+    networks:
+      default:
+        ipam:
+          driver: default
+          config:
+            - subnet: 172.28.0.0/24
 
-- Install docker-compose (1.19.0 or newer). Compose is a tool for
-  defining and running multi-container docker applications.
+    volumes:
+      cvat_data:
+        driver_opts:
+          type: none
+          device: /mnt/s3-cvat-default-volume/data
+          o: bind
+      cvat_keys:
+        driver_opts:
+          type: none
+          device: /mnt/s3-cvat-default-volume/keys
+          o: bind
+      cvat_logs:
+        driver_opts:
+          type: none
+          device: /mnt/s3-cvat-default-volume/logs
+          o: bind
+      cvat_models:
+        driver_opts:
+          type: none
+          device: /mnt/s3-cvat-default-volume/models
+          o: bind
+    ```
 
-  ```bash
-  sudo apt-get --no-install-recommends install -y python3-pip python3-setuptools
-  sudo python3 -m pip install setuptools docker-compose
-  ```
+2.  Edit analytics docker-compose file `sudo nano /root/cvat/components/analytics/docker-compose.analytics.yml`
 
-- Clone _CVAT_ source code from the
-  [GitHub repository](https://github.com/opencv/cvat).
+    ```
+    version: '3.3'
+    services:
+      cvat_elasticsearch:
+        container_name: cvat_elasticsearch
+        image: cvat_elasticsearch
+        networks:
+          default:
+            aliases:
+              - elasticsearch
+        build:
+          context: ./components/analytics/elasticsearch
+          args:
+            ELK_VERSION: 6.4.0
+        volumes:
+          - cvat_events:/usr/share/elasticsearch/data
+        restart: always
 
-  ```bash
-  sudo apt-get --no-install-recommends install -y git
-  git clone https://github.com/opencv/cvat
-  cd cvat
-  ```
+      cvat_kibana:
+        container_name: cvat_kibana
+        image: cvat_kibana
+        networks:
+          default:
+            aliases:
+              - kibana
+        build:
+          context: ./components/analytics/kibana
+          args:
+            ELK_VERSION: 6.4.0
+        depends_on: ['cvat_elasticsearch']
+        restart: always
 
-- Build docker images by default. It will take some time to download public
-  docker image ubuntu:16.04 and install all necessary ubuntu packages to run
-  CVAT server.
+      cvat_kibana_setup:
+        container_name: cvat_kibana_setup
+        image: cvat/server
+        volumes: ['./components/analytics/kibana:/home/django/kibana:ro']
+        depends_on: ['cvat']
+        working_dir: '/home/django'
+        entrypoint:
+          [
+            'bash',
+            'wait-for-it.sh',
+            'elasticsearch:9200',
+            '-t',
+            '0',
+            '--',
+            '/bin/bash',
+            'wait-for-it.sh',
+            'kibana:5601',
+            '-t',
+            '0',
+            '--',
+            'python3',
+            'kibana/setup.py',
+            'kibana/export.json',
+          ]
+        environment:
+          no_proxy: elasticsearch,kibana,${no_proxy}
 
-  ```bash
-  docker-compose build
-  ```
+      cvat_logstash:
+        container_name: cvat_logstash
+        image: cvat_logstash
+        networks:
+          default:
+            aliases:
+              - logstash
+        build:
+          context: ./components/analytics/logstash
+          args:
+            ELK_VERSION: 6.4.0
+            http_proxy: ${http_proxy}
+            https_proxy: ${https_proxy}
+        depends_on: ['cvat_elasticsearch']
+        restart: always
 
-- Run docker containers. It will take some time to download public docker
-  images like postgres:10.3-alpine, redis:4.0.5-alpine and create containers.
+      cvat:
+        environment:
+          DJANGO_LOG_SERVER_HOST: logstash
+          DJANGO_LOG_SERVER_PORT: 5000
+          DJANGO_LOG_VIEWER_HOST: kibana
+          DJANGO_LOG_VIEWER_PORT: 5601
+          CVAT_ANALYTICS: 1
+          no_proxy: kibana,logstash,nuclio,${no_proxy}
 
-  ```sh
-  docker-compose up -d
-  ```
+    volumes:
+      cvat_events:
+        driver_opts:
+          type: none
+          device: /mnt/s3-cvat-default-volume/events
+          o: bind
+    ```
 
-- You can register a user but by default it will not have rights even to view
-  list of tasks. Thus you should create a superuser. A superuser can use an
-  admin panel to assign correct groups to the user. Please use the command
-  below:
+## Upgrade Nuclio to latest 1.5.14
 
-  ```sh
-  docker exec -it cvat bash -ic 'python3 ~/manage.py createsuperuser'
-  ```
+1.  Edit serverless docker-compose file `sudo nano /root/cvat/components/serverless/docker-compose.serverless.yml`
 
-  Choose a username and a password for your admin account. For more information
-  please read [Django documentation](https://docs.djangoproject.com/en/2.2/ref/django-admin/#createsuperuser).
+    ```
+    version: '3.3'
+    services:
+      serverless:
+        container_name: nuclio
+        image: quay.io/nuclio/dashboard:1.5.14-amd64
+        restart: always
+        networks:
+          default:
+            aliases:
+              - nuclio
+        volumes:
+          - /tmp:/tmp
+          - /var/run/docker.sock:/var/run/docker.sock
+        environment:
+          http_proxy:
+          https_proxy:
+          no_proxy: 172.28.0.1,${no_proxy}
+          NUCLIO_CHECK_FUNCTION_CONTAINERS_HEALTHINESS: 'true'
+        ports:
+          - '8070:8070'
 
-- Google Chrome is the only browser which is supported by CVAT. You need to
-  install it as well. Type commands below in a terminal window:
+      cvat:
+        environment:
+          CVAT_SERVERLESS: 1
+          no_proxy: kibana,logstash,nuclio,${no_proxy}
 
-  ```sh
-  curl https://dl-ssl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
-  sudo sh -c 'echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google-chrome.list'
-  sudo apt-get update
-  sudo apt-get --no-install-recommends install -y google-chrome-stable
-  ```
+    volumes:
+      cvat_events:
+        driver_opts:
+          type: none
+          device: /mnt/s3-cvat-default-volume/events
+          o: bind
+    ```
 
-- Open the installed Google Chrome browser and go to [localhost:8080](http://localhost:8080).
-  Type your login/password for the superuser on the login page and press the _Login_
-  button. Now you should be able to create a new annotation task. Please read the
-  [CVAT user's guide](/cvat/apps/documentation/user_guide.md) for more details.
+## Add Host IP, Port, S3 file share
 
-### Semi-automatic and Automatic Annotation
+1.  Create docker-compose override file `sudo nano /root/cvat/docker-compose.override.yml`
 
+    ```
+    version: '3.3'
+    services:
+      cvat_proxy:
+        environment:
+          CVAT_HOST: .example.com
+        ports:
+          - '80:80'
+      cvat:
+        environment:
+          CVAT_SHARE_URL: 'AWS S3 Bucket'
+        volumes:
+          - cvat_share:/home/django/share:ro
 
-> **⚠ WARNING: Do not use `docker-compose up`**
->  If you did, make sure all containers are stopped by `docker-compose down`.
-- To bring up cvat with auto annotation tool, from cvat root directory, you need to run:
-  ```bash
-  docker-compose -f docker-compose.yml -f components/serverless/docker-compose.serverless.yml up -d
-  ```
-  If you did any changes to the docker-compose files, make sure to add `--build` at the end.
+    volumes:
+      cvat_share:
+        driver_opts:
+          type: none
+          device: /mnt/s3-cvat-default-volume/share
+          o: bind
+    ```
 
-  To stop the containers, simply run:
+## Build docker images
 
-  ```bash
-  docker-compose -f docker-compose.yml -f components/serverless/docker-compose.serverless.yml down
-  ```
+    docker-compose -f docker-compose.yml \
+        -f docker-compose.override.yml \
+        -f components/analytics/docker-compose.analytics.yml \
+        -f components/serverless/docker-compose.serverless.yml \
+        build
 
-- You have to install `nuctl` command line tool to build and deploy serverless
-  functions. Download [version 1.5.8](https://github.com/nuclio/nuclio/releases).
-  It is important that the version you download matches the version in
-  [docker-compose.serverless.yml](/components/serverless/docker-compose.serverless.yml)
-  After downloading the nuclio, give it a proper permission and do a softlink
-  ```
-  sudo chmod +x nuctl-<version>-linux-amd64
-  sudo ln -sf $(pwd)/nuctl-<version>-linux-amd64 /usr/local/bin/nuctl
-  ```
+## Run docker containers
 
-### Analytics: management and monitoring of data annotation team
+    docker-compose -f docker-compose.yml \
+        -f docker-compose.override.yml \
+        -f components/analytics/docker-compose.analytics.yml \
+        -f components/serverless/docker-compose.serverless.yml \
+        up -d
 
-It is possible to proxy annotation logs from client to ELK. To do that run the following command below:
+## Create super user account
 
-```bash
-# Build and run containers with Analytics component support:
-docker-compose -f docker-compose.yml -f components/analytics/docker-compose.analytics.yml up -d --build
-```
+    docker exec -it cvat bash -ic 'python3 ~/manage.py createsuperuser'
+
+## Removing tensorflow functions
+
+1.  Edit Nuclio functions deploy script `sudo nano /root/cvat/serverless/deploy_cpu.sh`
+
+    ```
+    #!/bin/bash
+
+    SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+
+    nuctl create project cvat
+    nuctl deploy --project-name cvat \
+        --path "$SCRIPT_DIR/openvino/omz/public/faster_rcnn_inception_v2_coco/nuclio" \
+        --volume "$SCRIPT_DIR/openvino/common:/opt/nuclio/common" \
+        --platform local
+
+    nuctl deploy --project-name cvat \
+        --path "$SCRIPT_DIR/openvino/omz/public/mask_rcnn_inception_resnet_v2_atrous_coco/nuclio" \
+        --volume "$SCRIPT_DIR/openvino/common:/opt/nuclio/common" \
+        --platform local
+
+    nuctl deploy --project-name cvat \
+        --path "$SCRIPT_DIR/openvino/omz/public/yolo-v3-tf/nuclio" \
+        --volume "$SCRIPT_DIR/openvino/common:/opt/nuclio/common" \
+        --platform local
+
+    nuctl deploy --project-name cvat \
+        --path "$SCRIPT_DIR/openvino/omz/intel/text-detection-0004/nuclio" \
+        --volume "$SCRIPT_DIR/openvino/common:/opt/nuclio/common" \
+        --platform local
+
+    nuctl deploy --project-name cvat \
+        --path "$SCRIPT_DIR/openvino/omz/intel/semantic-segmentation-adas-0001/nuclio" \
+        --volume "$SCRIPT_DIR/openvino/common:/opt/nuclio/common" \
+        --platform local
+
+    nuctl deploy --project-name cvat \
+        --path "$SCRIPT_DIR/openvino/omz/intel/person-reidentification-retail-300/nuclio" \
+        --volume "$SCRIPT_DIR/openvino/common:/opt/nuclio/common" \
+        --platform local
+
+    nuctl deploy --project-name cvat \
+        --path "$SCRIPT_DIR/openvino/dextr/nuclio" \
+        --volume "$SCRIPT_DIR/openvino/common:/opt/nuclio/common" \
+        --platform local
+
+    nuctl deploy --project-name cvat \
+        --path "$SCRIPT_DIR/pytorch/foolwood/siammask/nuclio" \
+        --platform local
+
+    nuctl deploy --project-name cvat \
+        --path "$SCRIPT_DIR/pytorch/saic-vul/fbrs/nuclio" \
+        --platform local
+
+    nuctl get function
+    ```
+
+## Install Nuclio
+
+    wget https://github.com/nuclio/nuclio/releases/download/1.5.14/nuctl-1.5.14-linux-amd64
+    sudo chmod +x nuctl-1.5.14-linux-amd64
+    sudo ln -sf $(pwd)/nuctl-1.5.14-linux-amd64 /usr/local/bin/nuctl
+
+## Setup Nuclio functions reload on boot
+
+1.  Create unit file `sudo nano /root/cvat/nuclio-container-restart.sh`
+
+    ```
+    #!/bin/bash
+    while [ "$( docker container inspect -f '{{.State.Status}}' cvat )" != "running" ]; do sleep 3; done;
+    nuctl delete function openvino-dextr
+    nuctl delete function openvino-mask-rcnn-inception-resnet-v2-atrous-coco
+    nuctl delete function openvino-omz-intel-person-reidentification-retail-0300
+    nuctl delete function openvino-omz-intel-text-detection-0004
+    nuctl delete function openvino-omz-public-faster_rcnn_inception_v2_coco
+    nuctl delete function openvino-omz-public-yolo-v3-tf
+    nuctl delete function openvino-omz-semantic-segmentation-adas-0001
+    nuctl delete function pth-foolwood-siammask
+    nuctl delete function pth-saic-vul-fbrs
+    nuctl delete project cvat
+    /root/cvat/serverless/deploy_cpu.sh
+    exit 0
+    ```
+
+2.  Allow execution permissions for the script file
+
+    ```
+    chmod u+x /root/cvat/nuclio-container-restart.sh
+    ```
+
+3. Create unit file `sudo nano /etc/systemd/system/nuclio-container-restart.service`
+
+    ```
+    [Unit]
+    Description=Restart all Nuclio Containers at boot after CVAT is loaded
+    After=network.target
+
+    [Service]
+    User=root
+    Group=root
+    ExecStart=/root/cvat/nuclio-container-restart.sh
+    Type=oneshot
+    RemainAfterExit=yes
+
+    [Install]
+    WantedBy=multi-user.target
+    ```
+
+1.  Update the system configurations, enable unit autorun when the system boots:
+
+    ```
+    systemctl daemon-reload
+    sudo systemctl enable nuclio-container-restart.service
+    ```
+
+1.  Execute the Nuclio functions deploy script
+
+    ```
+    serverless/deploy_cpu.sh
+    ```
 
 # Official CVAT Installation Guide
   - [Quick Installation Guide](https://github.com/openvinotoolkit/cvat/blob/develop/cvat/apps/documentation/installation.md)

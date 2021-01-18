@@ -38,7 +38,7 @@ cd cvat
 ```
 
 # Create S3 Bucket through AWS Console or AWS ClI
-cvat-default-volume
+S3 bucket name: cvat-default-volume
 
 # Install S3FS & setup auto-mount
 ```bash
@@ -75,6 +75,12 @@ sudo systemctl daemon-reload
 sudo systemctl enable s3fs.service
 sudo systemctl start s3fs.service
 ```
+
+# Create RDS PostgreSQL through AWS Console or AWS CLI
+Hostname Prefix: cvat-database
+Initial DB Name: db_name
+Master User Name: db_username
+Master Password: db_password
 
 # Remove PostgresSQL image, Add DB details (AWS RDS), Change volumes to S3
 ```bash

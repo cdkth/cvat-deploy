@@ -1,16 +1,15 @@
-# cvat-deploy
+# CVAT (S3 + RDS)
 
 - [Mounting cloud storage](#mounting-cloud-storage)
   - [AWS S3 bucket](#aws-s3-bucket-as-filesystem)
     - [Ubuntu 20.04](#aws_s3_ubuntu_2004)
       - [Mount](#aws_s3_mount)
       - [Automatically mount](#aws_s3_automatically_mount)
-        - [Using /etc/fstab](#aws_s3_using_fstab)
         - [Using systemd](#aws_s3_using_systemd)
-      - [Check](#aws_s3_check)
-      - [Unmount](#aws_s3_unmount_filesystem)
 - [Quick installation guide](#quick-installation-guide)
-  - [Ubuntu 18.04 (x86_64/amd64)](#ubuntu-1804-x86_64amd64)
+  - [Ubuntu 20.04 (x86_64/amd64)](#ubuntu-2004-x86_64amd64)
+    - [Semi-automatic and Automatic Annotation](#semi-automatic-and-automatic-annotation)
+    - [Analytics: management and monitoring of data annotation team](#analytics-management-and-monitoring-of-data-annotation-team)
 
 # Mounting cloud storage
 ## AWS S3 bucket as filesystem
@@ -77,7 +76,7 @@ the instructions below for other systems.
 Probably you need to modify the instructions below in case you are behind a proxy
 server. Proxy is an advanced topic and it is not covered by the guide.
 
-## Ubuntu 18.04 (x86_64/amd64)
+## Ubuntu 20.04 (x86_64/amd64)
 
 - Open a terminal window. If you don't know how to open a terminal window on
   Ubuntu please read [the answer](https://askubuntu.com/questions/183775/how-do-i-open-a-terminal).
@@ -199,3 +198,12 @@ server. Proxy is an advanced topic and it is not covered by the guide.
   sudo chmod +x nuctl-<version>-linux-amd64
   sudo ln -sf $(pwd)/nuctl-<version>-linux-amd64 /usr/local/bin/nuctl
   ```
+
+### Analytics: management and monitoring of data annotation team
+
+It is possible to proxy annotation logs from client to ELK. To do that run the following command below:
+
+```bash
+# Build and run containers with Analytics component support:
+docker-compose -f docker-compose.yml -f components/analytics/docker-compose.analytics.yml up -d --build
+```

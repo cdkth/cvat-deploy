@@ -9,6 +9,8 @@
         - [Using systemd](#aws_s3_using_systemd)
       - [Check](#aws_s3_check)
       - [Unmount](#aws_s3_unmount_filesystem)
+- [Quick installation guide](#quick-installation-guide)
+  - [Ubuntu 18.04 (x86_64/amd64)](#ubuntu-1804-x86_64amd64)
 
 # Mounting cloud storage
 ## AWS S3 bucket as filesystem
@@ -64,26 +66,6 @@ For more details see [here](https://github.com/s3fs-fuse/s3fs-fuse).
     sudo systemctl enable s3fs.service
     sudo systemctl start s3fs.service
     ```
-
-- [Quick installation guide](#quick-installation-guide)
-  - [Ubuntu 18.04 (x86_64/amd64)](#ubuntu-1804-x86_64amd64)
-  - [Windows 10](#windows-10)
-  - [Mac OS Mojave](#mac-os-mojave)
-  - [Advanced Topics](#advanced-topics)
-    - [Deploying CVAT behind a proxy](#deploying-cvat-behind-a-proxy)
-    - [Additional components](#additional-components)
-    - [Semi-automatic and automatic annotation](#semi-automatic-and-automatic-annotation)
-    - [Stop all containers](#stop-all-containers)
-    - [Advanced settings](#advanced-settings)
-    - [Share path](#share-path)
-    - [Email verification](#email-verification)
-    - [Serving over HTTPS](#serving-over-https)
-      - [Prerequisites](#prerequisites)
-      - [Roadmap](#roadmap)
-      - [Step-by-step instructions](#step-by-step-instructions)
-        - [1. Make the proxy listen on standard port 80 and prepare nginx for the ACME challenge via webroot method](#1-make-the-proxy-listen-on-standard-port-80-and-prepare-nginx-for-the-acme-challenge-via-webroot-method)
-        - [2. Setting up HTTPS with `acme.sh` helper](#2-setting-up-https-with-acmesh-helper)
-          - [Create certificate files using an ACME challenge on docker host](#create-certificate-files-using-an-acme-challenge-on-docker-host)
 
 # Quick installation guide
 

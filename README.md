@@ -207,3 +207,8 @@ It is possible to proxy annotation logs from client to ELK. To do that run the f
 # Build and run containers with Analytics component support:
 docker-compose -f docker-compose.yml -f components/analytics/docker-compose.analytics.yml up -d --build
 ```
+
+# Official CVAT Installation Guide
+  - [Quick Installation Guide](#https://github.com/openvinotoolkit/cvat/documentation/installation.md)
+  - [Mounting Cloud Storage](#https://github.com/openvinotoolkit/cvat/documentation/mounting_cloud_storages.md)
+  - [Semi-automatic and Automatic Annotation](#https://github.com/openvinotoolkit/cvat/documentation/installation_automatic_annotation.md)

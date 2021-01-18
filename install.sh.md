@@ -419,7 +419,7 @@ sudo chmod +x nuctl-1.5.14-linux-amd64
 sudo ln -sf $(pwd)/nuctl-1.5.14-linux-amd64 /usr/local/bin/nuctl
 ```
 
-# Setup Nuclio functions restart on boot
+# Setup Nuclio functions reload on boot
 ```bash
 cat > /root/cvat/nuclio-container-restart.sh << EOF
 #!/bin/bash

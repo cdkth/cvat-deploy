@@ -1,13 +1,10 @@
 # Prepare OS
 
-    ```bash
     sudo apt-get update -y
     sudo apt-get upgrade -y
-    ```
 
 # Install Docker & Docker Compose
 
-    ```bash
     sudo apt-get --no-install-recommends install -y \
       apt-transport-https \
       ca-certificates \
@@ -23,26 +20,21 @@
     sudo apt-get --no-install-recommends install -y docker-ce docker-ce-cli containerd.io
     sudo apt-get --no-install-recommends install -y python3-pip python3-setuptools
     sudo python3 -m pip install setuptools docker-compose
-    ```
 
 # Install Portainer for Docker Management (Optional)
 
-    ```bash
     docker volume create portainer_data
     docker run -d -p 8000:8000 -p 9000:9000 \
         --name=portainer \
         --restart=always \
         -v /var/run/docker.sock:/var/run/docker.sock \
         -v portainer_data:/data portainer/portainer-ce
-    ```
 
 # Install CVAT
 
-    ```bash
     sudo apt-get --no-install-recommends install -y git
     git clone https://github.com/opencv/cvat
     cd cvat
-    ```
 
 # <a name="aws_s3_mount">Automatically mount AWS S3 bucket as filesystem using S3FS</a>
 
@@ -58,13 +50,13 @@
 
 1.  Install s3fs:
 
-    ```bash
+    ```
     sudo apt install s3fs
     ```
 
 1.  Enter your credentials in a file  `/etc/passwd-s3fs`  and set owner-only permissions:
 
-    ```bash
+    ```
     echo ACCESS_KEY_ID:SECRET_ACCESS_KEY > /etc/passwd-s3fs
     chmod 640 /etc/passwd-s3fs
     ```
@@ -75,7 +67,7 @@ For more details see [here](https://github.com/s3fs-fuse/s3fs-fuse).
 
 1.  Create unit file `sudo nano /etc/systemd/system/s3fs.service`
 
-    ```bash
+    ```
     [Unit]
     Description=FUSE filesystem over AWS S3 bucket
     After=network.target
@@ -95,7 +87,7 @@ For more details see [here](https://github.com/s3fs-fuse/s3fs-fuse).
 
 1.  Update the system configurations, enable unit autorun when the system boots, mount the bucket:
 
-    ```bash
+    ```
     sudo systemctl daemon-reload
     sudo systemctl enable s3fs.service
     sudo systemctl start s3fs.service
@@ -112,7 +104,7 @@ For more details see [here](https://github.com/s3fs-fuse/s3fs-fuse).
 
 1.  Edit docker-compose file `sudo nano /root/cvat/docker-compose.yml`
 
-    ```bash
+    ```
     version: '3.3'
     services:
       cvat_redis:
@@ -223,7 +215,7 @@ For more details see [here](https://github.com/s3fs-fuse/s3fs-fuse).
 
 2.  Edit analytics docker-compose file `sudo nano /root/cvat/components/analytics/docker-compose.analytics.yml`
 
-    ```bash
+    ```
     version: '3.3'
     services:
       cvat_elasticsearch:
@@ -319,7 +311,7 @@ For more details see [here](https://github.com/s3fs-fuse/s3fs-fuse).
 
 1.  Edit serverless docker-compose file `sudo nano /root/cvat/components/serverless/docker-compose.serverless.yml`
 
-    ```bash
+    ```
     version: '3.3'
     services:
       serverless:
@@ -358,7 +350,7 @@ For more details see [here](https://github.com/s3fs-fuse/s3fs-fuse).
 
 1.  Create docker-compose override file `sudo nano /root/cvat/docker-compose.override.yml`
 
-    ```bash
+    ```
     version: '3.3'
     services:
       cvat_proxy:
@@ -382,7 +374,7 @@ For more details see [here](https://github.com/s3fs-fuse/s3fs-fuse).
 
 # Build docker images
 
-    ```bash
+    ```
     docker-compose -f docker-compose.yml \
         -f docker-compose.override.yml \
         -f components/analytics/docker-compose.analytics.yml \
@@ -392,7 +384,7 @@ For more details see [here](https://github.com/s3fs-fuse/s3fs-fuse).
 
 # Run docker containers
 
-    ```bash
+    ```
     docker-compose -f docker-compose.yml \
         -f docker-compose.override.yml \
         -f components/analytics/docker-compose.analytics.yml \
@@ -402,7 +394,7 @@ For more details see [here](https://github.com/s3fs-fuse/s3fs-fuse).
 
 # Create super user account
 
-    ```bash
+    ```
     docker exec -it cvat bash -ic 'python3 ~/manage.py createsuperuser'
     ```
 
@@ -410,7 +402,7 @@ For more details see [here](https://github.com/s3fs-fuse/s3fs-fuse).
 
 1.  Edit Nuclio functions deploy script `sudo nano /root/cvat/serverless/deploy_cpu.sh`
 
-    ```bash
+    ```
     #!/bin/bash
 
     SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
@@ -464,7 +456,7 @@ For more details see [here](https://github.com/s3fs-fuse/s3fs-fuse).
 
 # Install Nuclio
 
-    ```bash
+    ```
     wget https://github.com/nuclio/nuclio/releases/download/1.5.14/nuctl-1.5.14-linux-amd64
     sudo chmod +x nuctl-1.5.14-linux-amd64
     sudo ln -sf $(pwd)/nuctl-1.5.14-linux-amd64 /usr/local/bin/nuctl
@@ -474,7 +466,7 @@ For more details see [here](https://github.com/s3fs-fuse/s3fs-fuse).
 
 1.  Create unit file `sudo nano /root/cvat/nuclio-container-restart.sh`
 
-    ```bash
+    ```
     #!/bin/bash
     while [ "$( docker container inspect -f '{{.State.Status}}' cvat )" != "running" ]; do sleep 3; done;
     nuctl delete function openvino-dextr
@@ -493,13 +485,13 @@ For more details see [here](https://github.com/s3fs-fuse/s3fs-fuse).
 
 2.  Allow execution permissions for the script file
 
-    ```bash
+    ```
     chmod u+x /root/cvat/nuclio-container-restart.sh
     ```
 
 3. Create unit file `sudo nano /etc/systemd/system/nuclio-container-restart.service`
 
-    ```bash
+    ```
     [Unit]
     Description=Restart all Nuclio Containers at boot after CVAT is loaded
     After=network.target
@@ -517,13 +509,13 @@ For more details see [here](https://github.com/s3fs-fuse/s3fs-fuse).
 
 1.  Update the system configurations, enable unit autorun when the system boots:
 
-    ```bash
+    ```
     systemctl daemon-reload
     sudo systemctl enable nuclio-container-restart.service
     ```
 
 1.  Execute the Nuclio functions deploy script
 
-    ```bash
+    ```
     serverless/deploy_cpu.sh
     ```

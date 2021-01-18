@@ -374,29 +374,23 @@ For more details see [here](https://github.com/s3fs-fuse/s3fs-fuse).
 
 # Build docker images
 
-    ```
     docker-compose -f docker-compose.yml \
         -f docker-compose.override.yml \
         -f components/analytics/docker-compose.analytics.yml \
         -f components/serverless/docker-compose.serverless.yml \
         build
-    ```
 
 # Run docker containers
 
-    ```
     docker-compose -f docker-compose.yml \
         -f docker-compose.override.yml \
         -f components/analytics/docker-compose.analytics.yml \
         -f components/serverless/docker-compose.serverless.yml \
         up -d
-    ```
 
 # Create super user account
 
-    ```
     docker exec -it cvat bash -ic 'python3 ~/manage.py createsuperuser'
-    ```
 
 # Removing tensorflow functions
 
@@ -456,11 +450,9 @@ For more details see [here](https://github.com/s3fs-fuse/s3fs-fuse).
 
 # Install Nuclio
 
-    ```
     wget https://github.com/nuclio/nuclio/releases/download/1.5.14/nuctl-1.5.14-linux-amd64
     sudo chmod +x nuctl-1.5.14-linux-amd64
     sudo ln -sf $(pwd)/nuctl-1.5.14-linux-amd64 /usr/local/bin/nuctl
-    ```
 
 # Setup Nuclio functions reload on boot
 

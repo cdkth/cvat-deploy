@@ -37,6 +37,9 @@ git clone https://github.com/opencv/cvat
 cd cvat
 ```
 
+# Create S3 Bucket through AWS Console or AWS ClI
+cvat-default-volume
+
 # Install S3FS & setup auto-mount
 ```bash
 sudo apt install s3fs

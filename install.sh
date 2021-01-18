@@ -16,18 +16,26 @@ sudo add-apt-repository \
   stable"
 sudo apt-get update
 sudo apt-get --no-install-recommends install -y docker-ce docker-ce-cli containerd.io
-
 sudo apt-get --no-install-recommends install -y python3-pip python3-setuptools
 sudo python3 -m pip install setuptools docker-compose
 
 # Install Portainer for Docker Management (Optional)
 docker volume create portainer_data
-docker run -d -p 8000:8000 -p 9000:9000 --name=portainer --restart=always -v /var/run/docker.sock:/var/run/docker.sock -v portainer_data:/data portainer/portainer-ce
+docker run -d -p 8000:8000 -p 9000:9000 \
+    --name=portainer \
+    --restart=always \
+    -v /var/run/docker.sock:/var/run/docker.sock \
+    -v portainer_data:/data portainer/portainer-ce
 
 # Install CVAT
 sudo apt-get --no-install-recommends install -y git
 git clone https://github.com/opencv/cvat
 cd cvat
+
+# Create S3 bucket
+
+# Create mount point
+sudo mkdir /mnt/s3-cvat-default-volume
 
 # Install S3FS & setup auto-mount
 sudo apt install s3fs
@@ -36,8 +44,6 @@ sed -i "s/#user_allow_other/user_allow_other/g" /etc/fuse.conf
 
 echo ACCESS_KEY_ID:SECRET_ACCESS_KEY > /etc/passwd-s3fs
 chmod 640 /etc/passwd-s3fs
-
-mkdir /mnt/s3-cvat-default-volume
 
 cat > /etc/systemd/system/s3fs.service << EOF
 [Unit]
@@ -60,6 +66,8 @@ EOF
 sudo systemctl daemon-reload
 sudo systemctl enable s3fs.service
 sudo systemctl start s3fs.service
+
+# Create RDS PostgreSQL
 
 # Remove PostgresSQL image, Add DB details (AWS RDS), Change volumes to S3
 cat > /root/cvat/docker-compose.yml << EOF
@@ -323,10 +331,18 @@ volumes:
 EOF
 
 # Build docker images
-docker-compose -f docker-compose.yml -f docker-compose.override.yml -f components/analytics/docker-compose.analytics.yml -f components/serverless/docker-compose.serverless.yml build
+docker-compose -f docker-compose.yml \
+    -f docker-compose.override.yml \
+    -f components/analytics/docker-compose.analytics.yml \
+    -f components/serverless/docker-compose.serverless.yml \
+    build
 
 # Run docker containers
-docker-compose -f docker-compose.yml -f docker-compose.override.yml -f components/analytics/docker-compose.analytics.yml -f components/serverless/docker-compose.serverless.yml up -d
+docker-compose -f docker-compose.yml \
+    -f docker-compose.override.yml \
+    -f components/analytics/docker-compose.analytics.yml \
+    -f components/serverless/docker-compose.serverless.yml \
+    up -d
 
 # Create super user account
 docker exec -it cvat bash -ic 'python3 ~/manage.py createsuperuser'

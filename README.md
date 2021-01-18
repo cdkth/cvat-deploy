@@ -209,6 +209,6 @@ docker-compose -f docker-compose.yml -f components/analytics/docker-compose.anal
 ```
 
 # Official CVAT Installation Guide
-  - [Quick Installation Guide](#https://github.com/openvinotoolkit/cvat/blob/develop/cvat/apps/documentation/installation.md)
-  - [Mounting Cloud Storage](#https://github.com/openvinotoolkit/cvat/blob/develop/cvat/apps/documentation/mounting_cloud_storages.md)
-  - [Semi-automatic and Automatic Annotation](#https://github.com/openvinotoolkit/cvat/apps/documentation/installation_automatic_annotation.md)
+  - [Quick Installation Guide](https://github.com/openvinotoolkit/cvat/blob/develop/cvat/apps/documentation/installation.md)
+  - [Mounting Cloud Storage](https://github.com/openvinotoolkit/cvat/blob/develop/cvat/apps/documentation/mounting_cloud_storages.md)
+  - [Semi-automatic and Automatic Annotation](https://github.com/openvinotoolkit/cvat/apps/documentation/installation_automatic_annotation.md)

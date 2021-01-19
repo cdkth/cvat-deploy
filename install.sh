@@ -307,7 +307,7 @@ volumes:
       o: bind
 EOF
 
-# Add Host IP, Port, S3 file share
+# Add Host, Port, S3 file share, SSL dirs
 cat > /root/cvat/docker-compose.override.yml << EOF
 version: '3.3'
 services:
@@ -316,8 +316,13 @@ services:
       CVAT_HOST: .example.com
     ports:
       - '80:80'
+      - '443:443'
+    volumes:
+      - ./letsencrypt-webroot:/var/tmp/letsencrypt-webroot
+      - /mnt/s3-cvat-default-volume/ssl:/root/ssl/
   cvat:
     environment:
+      ALLOWED_HOSTS: '*'
       CVAT_SHARE_URL: 'AWS S3 Bucket'
     volumes:
       - cvat_share:/home/django/share:ro
@@ -328,6 +333,92 @@ volumes:
       type: none
       device: /mnt/s3-cvat-default-volume/share
       o: bind
+EOF
+
+# Email verification
+sed -i "/ACCOUNT_EMAIL_VERIFICATION = 'none'/c \
+    ACCOUNT_AUTHENTICATION_METHOD = 'username'\n
+    ACCOUNT_CONFIRM_EMAIL_ON_GET = True\n
+    ACCOUNT_EMAIL_REQUIRED = True\n
+    ACCOUNT_EMAIL_VERIFICATION = 'mandatory'\n
+    # Email backend settings for Django\n
+    EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'\n
+    EMAIL_HOST = 'localhost'\n
+    EMAIL_PORT = 25\n
+    EMAIL_HOST_USER = 'username'\n
+    EMAIL_HOST_PASSWORD = 'password'\n
+    EMAIL_USE_TLS = True\n
+    DEFAULT_FROM_EMAIL = 'webmaster@localhost'" /root/cvat/cvat/settings/base.py
+
+# Serving over HTTPS
+sudo apt install socat
+sudo mkdir -p /root/cvat/letsencrypt-webroot/.well-known/acme-challenge
+
+git clone https://github.com/Neilpang/acme.sh.git
+cd acme.sh
+./acme.sh --install  \
+--cert-home  /mnt/s3-cvat-default-volume/ssl
+
+~/.acme.sh/acme.sh --install-cronjob
+
+# Add https to Nginx
+cat > /root/cvat/cvat_proxy/conf.d/cvat.conf.template << EOF
+server {
+    listen       80;
+    server_name  _ default;
+    return       404;
+}
+
+server {
+    listen       80;
+    server_name  ${CVAT_HOST};
+
+    location ^~ /.well-known/acme-challenge/ {
+      default_type "text/plain";
+      root /var/tmp/letsencrypt;
+    }
+
+    location / {
+      return 301 https://$server_name$request_uri;
+    }
+}
+
+server {
+    listen 443 ssl;
+    ssl_certificate /root/ssl/example.com/example.com.cer;
+    ssl_certificate_key /root/ssl/example.com/example.com.key;
+    ssl_trusted_certificate /root/ssl/example.com/fullchain.cer;
+
+    # security options
+    ssl_protocols TLSv1 TLSv1.1 TLSv1.2;
+    ssl_prefer_server_ciphers on;
+    ssl_stapling on;
+    ssl_session_timeout 24h;
+    ssl_session_cache shared:SSL:2m;
+    ssl_ciphers 'ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-AES256-GCM-SHA384:DHE-RSA-AES128-GCM-SHA256:DHE-DSS-AES128-GCM-SHA256:kEDH+AESGCM:ECDHE-RSA-AES128-SHA256:ECDHE-ECDSA-AES128-SHA256:ECDHE-RSA-AES128-SHA:ECDHE-ECDSA-AES128-SHA:ECDHE-RSA-AES256-SHA384:ECDHE-ECDSA-AES256-SHA384:ECDHE-RSA-AES256-SHA:ECDHE-ECDSA-AES256-SHA:DHE-RSA-AES128-SHA256:DHE-RSA-AES128-SHA:DHE-DSS-AES128-SHA256:DHE-RSA-AES256-SHA256:DHE-DSS-AES256-SHA:DHE-RSA-AES256-SHA:AES128-GCM-SHA256:AES256-GCM-SHA384:AES128-SHA256:AES256-SHA256:AES128-SHA:AES256-SHA:AES:CAMELLIA:DES-CBC3-SHA:!aNULL:!eNULL:!EXPORT:!DES:!RC4:!MD5:!PSK:!aECDH:!EDH-DSS-DES-CBC3-SHA:!EDH-RSA-DES-CBC3-SHA:!KRB5-DES-CBC3-SHA:!3DES';
+
+    # security headers
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-XSS-Protection "1; mode=block" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header Referrer-Policy "no-referrer-when-downgrade" always;
+    add_header Content-Security-Policy "default-src 'self' http: https: data: blob: 'unsafe-inline'" always;
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload" always;
+
+    server_name  ${CVAT_HOST};
+
+    proxy_pass_header       X-CSRFToken;
+    proxy_set_header        Host $http_host;
+    proxy_pass_header       Set-Cookie;
+
+    location ~* /api/.*|git/.*|analytics/.*|static/.*|admin(?:/(.*))?.*|documentation/.*|django-rq(?:/(.*))? {
+        proxy_pass              http://cvat:8080;
+    }
+
+    location / {
+        proxy_pass              http://cvat_ui;
+    }
+}
 EOF
 
 # Build docker images

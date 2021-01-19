@@ -381,7 +381,7 @@ For more details see [here](https://github.com/s3fs-fuse/s3fs-fuse).
 
 ## Email verification
 
-1.  Configure Django allauth to enable email verification (ACCOUNT_EMAIL_VERIFICATION = 'mandatory').
+Configure Django allauth to enable email verification (ACCOUNT_EMAIL_VERIFICATION = 'mandatory').
 
 Edit the settings file `sudo nano /root/cvat/cvat/settings/base.py`
 

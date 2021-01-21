@@ -1,8 +1,8 @@
 # CVAT (S3 + RDS) - AMI Build Guide
 
-Linux Distribution: Ubuntu 20.04
-Machine Type: t3.xlarge - 4 vCPUs, 16GM Memory, 100GB Storage (minimum recommended)
-CVAT Version: 1.3.0
+Linux Distribution: Ubuntu 20.04  
+Machine Type: t3.xlarge - 4 vCPUs, 16GM Memory, 100GB Storage (recommended)  
+CVAT Version: 1.3.0  
 Nuclio Version: 1.5.14
 
 ## Prepare OS

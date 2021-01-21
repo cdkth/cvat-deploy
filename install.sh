@@ -14,7 +14,7 @@ sudo add-apt-repository \
   "deb [arch=amd64] https://download.docker.com/linux/ubuntu \
   $(lsb_release -cs) \
   stable"
-sudo apt-get update
+sudo apt-get update -y
 sudo apt-get --no-install-recommends install -y docker-ce docker-ce-cli containerd.io
 sudo apt-get --no-install-recommends install -y python3-pip python3-setuptools
 sudo python3 -m pip install setuptools docker-compose
@@ -29,8 +29,7 @@ docker run -d -p 8000:8000 -p 9000:9000 \
 
 # Install CVAT
 sudo apt-get --no-install-recommends install -y git
-git clone https://github.com/opencv/cvat
-cd cvat
+git clone https://github.com/opencv/cvat /root/cvat
 
 # Create S3 bucket
 
@@ -45,7 +44,7 @@ sed -i "s/#user_allow_other/user_allow_other/g" /etc/fuse.conf
 echo ACCESS_KEY_ID:SECRET_ACCESS_KEY > /etc/passwd-s3fs
 chmod 640 /etc/passwd-s3fs
 
-cat > /etc/systemd/system/s3fs.service << EOF
+cat > /etc/systemd/system/s3fs.service << 'EOF'
 [Unit]
 Description=FUSE filesystem over AWS S3 bucket
 After=network.target
@@ -54,7 +53,7 @@ After=network.target
 Environment="MOUNT_POINT=/mnt/s3-cvat-default-volume"
 User=root
 Group=root
-ExecStart=s3fs cvat-default-volume ${MOUNT_POINT} -o passwd_file=/etc/passwd-s3fs -o allow_other -o umask=0022
+ExecStart=s3fs cvat-default-volume ${MOUNT_POINT} -o passwd_file=/etc/passwd-s3fs -o allow_other -o umask=0022 -o endpoint='us-west-1'
 ExecStop=fusermount -u ${MOUNT_POINT}
 Restart=always
 Type=forking
@@ -70,7 +69,7 @@ sudo systemctl start s3fs.service
 # Create RDS PostgreSQL
 
 # Remove PostgresSQL image, Add DB details (AWS RDS), Change volumes to S3
-cat > /root/cvat/docker-compose.yml << EOF
+cat > /root/cvat/docker-compose.yml << 'EOF'
 version: '3.3'
 services:
   cvat_redis:
@@ -179,7 +178,7 @@ volumes:
       o: bind
 EOF
 
-cat > /root/cvat/components/analytics/docker-compose.analytics.yml << EOF
+cat > /root/cvat/components/analytics/docker-compose.analytics.yml << 'EOF'
 version: '3.3'
 services:
   cvat_elasticsearch:
@@ -272,7 +271,7 @@ volumes:
 EOF
 
 # Upgrade Nuclio to latest 1.5.14
-cat > /root/cvat/components/serverless/docker-compose.serverless.yml << EOF
+cat > /root/cvat/components/serverless/docker-compose.serverless.yml << 'EOF'
 version: '3.3'
 services:
   serverless:
@@ -308,7 +307,7 @@ volumes:
 EOF
 
 # Add Host, Port, S3 file share, SSL dirs
-cat > /root/cvat/docker-compose.override.yml << EOF
+cat > /root/cvat/docker-compose.override.yml << 'EOF'
 version: '3.3'
 services:
   cvat_proxy:
@@ -337,17 +336,17 @@ EOF
 
 # Email verification
 sed -i "/ACCOUNT_EMAIL_VERIFICATION = 'none'/c \
-    ACCOUNT_AUTHENTICATION_METHOD = 'username'\n
-    ACCOUNT_CONFIRM_EMAIL_ON_GET = True\n
-    ACCOUNT_EMAIL_REQUIRED = True\n
-    ACCOUNT_EMAIL_VERIFICATION = 'mandatory'\n
-    # Email backend settings for Django\n
-    EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'\n
-    EMAIL_HOST = 'localhost'\n
-    EMAIL_PORT = 25\n
-    EMAIL_HOST_USER = 'username'\n
-    EMAIL_HOST_PASSWORD = 'password'\n
-    EMAIL_USE_TLS = True\n
+    ACCOUNT_AUTHENTICATION_METHOD = 'username'\n \
+    ACCOUNT_CONFIRM_EMAIL_ON_GET = True\n \
+    ACCOUNT_EMAIL_REQUIRED = True\n \
+    ACCOUNT_EMAIL_VERIFICATION = 'mandatory'\n \
+    # Email backend settings for Django\n \
+    EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'\n \
+    EMAIL_HOST = 'localhost'\n \
+    EMAIL_PORT = 25\n \
+    EMAIL_HOST_USER = 'username'\n \
+    EMAIL_HOST_PASSWORD = 'password'\n \
+    EMAIL_USE_TLS = True\n \
     DEFAULT_FROM_EMAIL = 'webmaster@localhost'" /root/cvat/cvat/settings/base.py
 
 # Serving over HTTPS
@@ -359,10 +358,8 @@ cd acme.sh
 ./acme.sh --install  \
 --cert-home  /mnt/s3-cvat-default-volume/ssl
 
-~/.acme.sh/acme.sh --install-cronjob
-
 # Add https to Nginx
-cat > /root/cvat/cvat_proxy/conf.d/cvat.conf.template << EOF
+cat > /root/cvat/cvat_proxy/conf.d/cvat.conf.template << 'EOF'
 server {
     listen       80;
     server_name  _ default;
@@ -422,24 +419,21 @@ server {
 EOF
 
 # Build docker images
-docker-compose -f docker-compose.yml \
-    -f docker-compose.override.yml \
-    -f components/analytics/docker-compose.analytics.yml \
-    -f components/serverless/docker-compose.serverless.yml \
+docker-compose -f /root/cvat/docker-compose.yml \
+    -f /root/cvat/docker-compose.override.yml \
+    -f /root/cvat/components/analytics/docker-compose.analytics.yml \
+    -f /root/cvat/components/serverless/docker-compose.serverless.yml \
     build
 
 # Run docker containers
-docker-compose -f docker-compose.yml \
-    -f docker-compose.override.yml \
-    -f components/analytics/docker-compose.analytics.yml \
-    -f components/serverless/docker-compose.serverless.yml \
+docker-compose -f /root/cvat/docker-compose.yml \
+    -f /root/cvat/docker-compose.override.yml \
+    -f /root/cvat/components/analytics/docker-compose.analytics.yml \
+    -f /root/cvat/components/serverless/docker-compose.serverless.yml \
     up -d
 
-# Create super user account
-docker exec -it cvat bash -ic 'python3 ~/manage.py createsuperuser'
-
 # Removing tensorflow functions
-cat > /root/cvat/serverless/deploy_cpu.sh << EOF
+cat > /root/cvat/serverless/deploy_cpu.sh << 'EOF'
 #!/bin/bash
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
@@ -492,12 +486,12 @@ nuctl get function
 EOF
 
 # Install Nuclio
-wget https://github.com/nuclio/nuclio/releases/download/1.5.14/nuctl-1.5.14-linux-amd64
-sudo chmod +x nuctl-1.5.14-linux-amd64
-sudo ln -sf $(pwd)/nuctl-1.5.14-linux-amd64 /usr/local/bin/nuctl
+wget https://github.com/nuclio/nuclio/releases/download/1.5.14/nuctl-1.5.14-linux-amd64 -O /root/cvat/nuctl-1.5.14-linux-amd64
+sudo chmod +x /root/cvat/nuctl-1.5.14-linux-amd64
+sudo ln -sf /root/cvat/nuctl-1.5.14-linux-amd64 /usr/local/bin/nuctl
 
 # Setup Nuclio functions reload on boot
-cat > /root/cvat/nuclio-container-restart.sh << EOF
+cat > /root/cvat/nuclio-container-restart.sh << 'EOF'
 #!/bin/bash
 while [ "$( docker container inspect -f '{{.State.Status}}' cvat )" != "running" ]; do sleep 3; done;
 nuctl delete function openvino-dextr
@@ -516,7 +510,7 @@ EOF
 
 chmod u+x /root/cvat/nuclio-container-restart.sh
 
-cat > /etc/systemd/system/nuclio-container-restart.service << EOF
+cat > /etc/systemd/system/nuclio-container-restart.service << 'EOF'
 [Unit]
 Description=Restart all Nuclio Containers at boot after CVAT is loaded
 After=network.target
@@ -535,4 +529,4 @@ EOF
 systemctl daemon-reload
 sudo systemctl enable nuclio-container-restart.service
 
-serverless/deploy_cpu.sh
+/root/cvat/serverless/deploy_cpu.sh

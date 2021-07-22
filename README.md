@@ -439,7 +439,23 @@ With the following:
     ~/.acme.sh/acme.sh --install-cronjob
     ```
 
-5.  Edit the Nginx configuration file `sudo nano /root/cvat/cvat_proxy/conf.d/cvat.conf.template`
+5.  Create a dir for installing cert manually
+
+    ```
+    sudo mkdir -p /mnt/s3-cvat-default-volume/ssl/live/labelit.pictures
+    ```
+
+6.  Install SSL certificate
+
+    ```
+    ~/.acme.sh/acme.sh --install-cert -d labelit.pictures -d www.labelit.pictures \
+      --cert-file /mnt/s3-cvat-default-volume/ssl/live/labelit.pictures/cert.pem \
+      --key-file /mnt/s3-cvat-default-volume/ssl/live/labelit.pictures/key.pem \
+      --fullchain-file /mnt/s3-cvat-default-volume/ssl/live/labelit.pictures/fullchain.pem \
+      --ca-file /mnt/s3-cvat-default-volume/ssl/live/labelit.pictures/ca.pem
+    ```
+
+7.  Edit the Nginx configuration file `sudo nano /root/cvat/cvat_proxy/conf.d/cvat.conf.template`
 
     ```
     server {
@@ -454,7 +470,7 @@ With the following:
 
         location ^~ /.well-known/acme-challenge/ {
           default_type "text/plain";
-          root /var/tmp/letsencrypt;
+          root /var/tmp/letsencrypt-webroot;
         }
 
         location / {
@@ -464,17 +480,20 @@ With the following:
 
     server {
         listen 443 ssl;
-        ssl_certificate /root/ssl/example.com/example.com.cer;
-        ssl_certificate_key /root/ssl/example.com/example.com.key;
-        ssl_trusted_certificate /root/ssl/example.com/fullchain.cer;
+        ssl_certificate /root/ssl/live/labelit.pictures/fullchain.pem;
+        ssl_certificate_key /root/ssl/live/labelit.pictures/key.pem;
+        ssl_trusted_certificate /root/ssl/live/labelit.pictures/ca.pem;
 
         # security options
         ssl_protocols TLSv1 TLSv1.1 TLSv1.2;
         ssl_prefer_server_ciphers on;
         ssl_stapling on;
+        ssl_stapling_verify on;
         ssl_session_timeout 24h;
         ssl_session_cache shared:SSL:2m;
         ssl_ciphers 'ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-AES256-GCM-SHA384:DHE-RSA-AES128-GCM-SHA256:DHE-DSS-AES128-GCM-SHA256:kEDH+AESGCM:ECDHE-RSA-AES128-SHA256:ECDHE-ECDSA-AES128-SHA256:ECDHE-RSA-AES128-SHA:ECDHE-ECDSA-AES128-SHA:ECDHE-RSA-AES256-SHA384:ECDHE-ECDSA-AES256-SHA384:ECDHE-RSA-AES256-SHA:ECDHE-ECDSA-AES256-SHA:DHE-RSA-AES128-SHA256:DHE-RSA-AES128-SHA:DHE-DSS-AES128-SHA256:DHE-RSA-AES256-SHA256:DHE-DSS-AES256-SHA:DHE-RSA-AES256-SHA:AES128-GCM-SHA256:AES256-GCM-SHA384:AES128-SHA256:AES256-SHA256:AES128-SHA:AES256-SHA:AES:CAMELLIA:DES-CBC3-SHA:!aNULL:!eNULL:!EXPORT:!DES:!RC4:!MD5:!PSK:!aECDH:!EDH-DSS-DES-CBC3-SHA:!EDH-RSA-DES-CBC3-SHA:!KRB5-DES-CBC3-SHA:!3DES';
+        
+        resolver 8.8.8.8;
 
         # security headers
         add_header X-Frame-Options "SAMEORIGIN" always;

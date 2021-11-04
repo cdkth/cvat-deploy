@@ -452,7 +452,8 @@ With the following:
       --cert-file /mnt/s3-cvat-default-volume/ssl/live/labelit.pictures/cert.pem \
       --key-file /mnt/s3-cvat-default-volume/ssl/live/labelit.pictures/key.pem \
       --fullchain-file /mnt/s3-cvat-default-volume/ssl/live/labelit.pictures/fullchain.pem \
-      --ca-file /mnt/s3-cvat-default-volume/ssl/live/labelit.pictures/ca.pem
+      --ca-file /mnt/s3-cvat-default-volume/ssl/live/labelit.pictures/ca.pem \
+      --reloadcmd "docker restart cvat_proxy"
     ```
 
 7.  Edit the Nginx configuration file `sudo nano /root/cvat/cvat_proxy/conf.d/cvat.conf.template`
